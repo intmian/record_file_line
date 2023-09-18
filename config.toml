@@ -1,0 +1,5 @@
+log_addr = "./"
+monit_addr = [
+    "F:\\tool",
+    "E:\\安装包工具"
+]
