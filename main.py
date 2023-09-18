@@ -51,26 +51,53 @@ def AddLog(addr,diff):
                     f.write('\t\t'+j+'\n')
         f.write('\n')
 
-def RecordNow(addr,addr2files):
+def RecordNow(addr,addr2files,removed):
+    # 以addr2files为基础，将addr2filesHis中存在而addr2files也存在的记录下来并
+    record = {}
+    for dic in addr2files:
+        record[dic] = []
+        for file in addr2files[dic]:
+            record[dic].append(file)
+        if dic in removed:
+            for file in removed[dic]:
+                if file not in record[dic]:
+                    record[dic].append(file + '(removed)')
     with open(addr,'w') as f:
-        for i in addr2files:
-            f.write(i+':\n')
-            for j in addr2files[i]:
-                f.write('\t'+j+'\n')
-    
+        for dic in record:
+            f.write(dic+':\n')
+            for file in record[dic]:
+                f.write('\t'+file+'\n')
+            f.write('\n')
 
 def ReadRecord(addr):
     addr2files = {}
+    exist = {}
+    removed = {}
     if not os.path.exists(addr):
-        return addr2files
+        return addr2files,removed
     with open(addr) as f:
         for line in f:
+            if line == '\n':
+                continue
             if line[0] == '\t':
                 addr2files[addr].append(line[1:-1])
             else:
                 addr = line[:-2]
                 addr2files[addr] = []
-    return addr2files
+    
+    # 将以(removed)开头的文件存储于removed,exist
+    for addr in addr2files:
+        for file in addr2files[addr]:
+            if file[-9:] == '(removed)':
+                if addr not in removed:
+                    removed[addr] = []
+                removed[addr].append(file[:-9])
+            else:
+                if addr not in exist:
+                    exist[addr] = []
+                exist[addr].append(file)
+
+    return exist,removed
     
     
     
@@ -89,13 +116,21 @@ def main():
     moni_addr = toml['monit_addr']
 
     last = {}
-    last = ReadRecord(record_addr)
+    last,removed = ReadRecord(record_addr)
     now = {}
     for addr in moni_addr:
         now[addr] = ReadNow(addr)
     diff = Compare(last,now)
     AddLog(log_addr,diff)
-    RecordNow(record_addr,now)
+    # 补充removed
+    for dic in diff:
+        if diff[dic].remove:
+            if dic not in removed:
+                removed[dic] = []
+            for file in diff[dic].remove:
+                if file not in removed[dic]:
+                    removed[dic].append(file)
+    RecordNow(record_addr,now,removed)
 
     
 if __name__ == '__main__':
